@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交通部中央氣象署 - 36小時天氣預報</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --cwa-blue: #003060;
+            /* Darker blue like CWA header */
+            --cwa-light-blue: #004e9c;
+            --cwa-bg: #f5f5f5;
+            --cwa-text: #333;
+            --cwa-footer-bg: #333;
+            --cwa-footer-text: #ccc;
+        }
+
+        body {
+            background-color: var(--cwa-bg);
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            color: var(--cwa-text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            padding: 5px 0;
+            font-size: 0.85rem;
+        }
+
+        .top-nav a {
+            color: #666;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+
+        .top-nav a:hover {
+            color: var(--cwa-blue);
+        }
+
+        /* Main Header */
+        .main-header {
+            background: linear-gradient(to right, var(--cwa-blue), var(--cwa-light-blue));
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .brand-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-sub {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-left: 10px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            padding-left: 10px;
+        }
+
+        /* Content Area */
+        .main-content {
+            flex: 1;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        /* Cards */
+        .cwa-card {
+            border: none;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            background: white;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .cwa-card-header {
+            background-color: white;
+            border-bottom: 3px solid var(--cwa-light-blue);
+            padding: 15px;
+            font-weight: bold;
+            color: var(--cwa-text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cwa-card-body {
+            padding: 20px;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--cwa-footer-bg);
+            color: var(--cwa-footer-text);
+            padding: 2rem 0;
+            font-size: 0.9rem;
+            margin-top: auto;
+        }
+
+        .footer a {
+            color: #aaa;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            color: white;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: var(--cwa-blue);
+            flex-direction: column;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        /* Custom Form Controls */
+        .form-select {
+            border-radius: 0;
+            border-color: #ddd;
+        }
+
+        .form-select:focus {
+            border-color: var(--cwa-light-blue);
+            box-shadow: 0 0 0 0.2rem rgba(0, 78, 156, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading">
+        <div class="spinner-border mb-2 text-primary" role="status"></div>
+        <span id="loading-text" class="fw-bold">正在連線至氣象資料開放平台...</span>
+    </div>
+
+    <!-- Top Nav -->
+    <div class="top-nav d-none d-md-block">
+        <div class="container text-end">
+            <a href="#"><i class="fas fa-home"></i> 首頁</a>
+            <a href="#"><i class="fas fa-sitemap"></i> 網站導覽</a>
+            <a href="#"><i class="fas fa-envelope"></i> 意見信箱</a>
+            <a href="#">English</a>
+        </div>
+    </div>
+
+    <!-- Main Header -->
+    <header class="main-header">
+        <div class="container">
+            <div class="d-flex align-items-center">
+                <div class="brand-logo">
+                    <i class="fas fa-cloud-sun-rain"></i> 交通部中央氣象署
+                </div>
+                <div class="brand-sub d-none d-sm-block">
+                    Central Weather Administration
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-content container">
+        <!-- Breadcrumb Simulation -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#" class="text-decoration-none text-secondary">首頁</a></li>
+                <li class="breadcrumb-item"><a href="#" class="text-decoration-none text-secondary">預報</a></li>
+                <li class="breadcrumb-item active" aria-current="page">36小時天氣預報</li>
+            </ol>
+        </nav>
+
+        <div class="row">
+            <!-- Sidebar / Controls -->
+            <div class="col-lg-3 mb-4">
+                <div class="cwa-card h-100">
+                    <div class="cwa-card-header">
+                        <span><i class="fas fa-map-marker-alt me-2"></i>選擇地點</span>
+                    </div>
+                    <div class="cwa-card-body">
+                        <label for="locationSelect" class="form-label text-muted small">請選擇縣市</label>
+                        <select id="locationSelect" class="form-select mb-3">
+                            <option value="" disabled selected>資料載入中...</option>
+                        </select>
+
+                        <hr>
+
+                        <div class="text-center mt-4">
+                            <h3 id="currentCityTitle" class="fw-bold text-dark mb-2">--</h3>
+                            <div id="weatherDesc" class="badge bg-primary fs-6 fw-normal text-wrap lh-base p-2">
+                                --
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Chart Area -->
+            <div class="col-lg-9">
+                <div class="cwa-card">
+                    <div class="cwa-card-header">
+                        <span><i class="fas fa-chart-line me-2"></i>氣溫與降雨機率預測</span>
+                        <small class="text-muted fw-normal">未來 36 小時</small>
+                    </div>
+                    <div class="cwa-card-body">
+                        <div class="chart-container">
+                            <canvas id="weatherChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <h5 class="mb-3">交通部中央氣象署</h5>
+                    <p class="mb-1">地址：100006 臺北市中正區公園路64號</p>
+                    <p class="mb-1">總機：(02)2349-1000 (代表號)</p>
+                    <p class="mb-1">氣象查詢：(02)2349-1234</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>Copyright © 2025 Central Weather Administration. All rights reserved.</p>
+                    <p class="small text-muted">本網站參考氣象署官網樣式製作，僅供練習使用。</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 設定區
+        const API_KEY = 'CWA-DEDE676B-7ECA-4FC0-B47E-CCDEE3A7E537';
+        const API_URL = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=${API_KEY}&format=JSON`;
+
+        let allLocationsData = [];
+        let myChart = null;
+
+        document.addEventListener('DOMContentLoaded', fetchWeatherData);
+
+        async function fetchWeatherData() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+
+                if (data.success !== "true") {
+                    throw new Error("API 回傳失敗，請檢查 Token");
+                }
+
+                if (data.records && data.records.location) {
+                    allLocationsData = data.records.location;
+                } else {
+                    console.log("Debug Data:", data);
+                    throw new Error("資料結構不如預期 (找不到 records.location)");
+                }
+
+                initLocationSelect();
+                document.getElementById('loading').style.display = 'none';
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="text-danger text-center p-3">
+                        <h4><i class="fas fa-exclamation-triangle"></i> 讀取失敗</h4>
+                        <p>${error.message}</p>
+                        <button class="btn btn-outline-danger mt-2" onclick="location.reload()">重試</button>
+                    </div>`;
+            }
+        }
+
+        function initLocationSelect() {
+            const select = document.getElementById('locationSelect');
+            select.innerHTML = '';
+
+            allLocationsData.forEach((loc, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = loc.locationName;
+                select.appendChild(option);
+            });
+
+            let defaultIndex = allLocationsData.findIndex(l => l.locationName === "臺北市");
+            if (defaultIndex === -1) defaultIndex = 0;
+            select.value = defaultIndex;
+
+            select.addEventListener('change', (e) => updateChart(e.target.value));
+            updateChart(defaultIndex);
+        }
+
+        function updateChart(index) {
+            const locationData = allLocationsData[index];
+            document.getElementById('currentCityTitle').textContent = locationData.locationName;
+
+            const weatherElements = locationData.weatherElement;
+            const getEl = (name) => weatherElements.find(el => el.elementName === name);
+
+            const popData = getEl('PoP');
+            const minTData = getEl('MinT');
+            const maxTData = getEl('MaxT');
+            const wxData = getEl('Wx');
+
+            const currentWx = wxData.time[0].parameter.parameterName;
+            const currentPop = popData.time[0].parameter.parameterName;
+            document.getElementById('weatherDesc').textContent = `${currentWx} | 降雨機率 ${currentPop}%`;
+
+            const labels = [];
+            const minTValues = [];
+            const maxTValues = [];
+            const popValues = [];
+
+            minTData.time.forEach((item, i) => {
+                const startTime = new Date(item.startTime);
+                const endTime = new Date(item.endTime);
+
+                // Format: 12/03 早/晚
+                const formatTime = (d) => {
+                    const month = d.getMonth() + 1;
+                    const date = d.getDate();
+                    const hour = d.getHours();
+                    const period = hour < 12 ? "白天" : "晚上";
+                    return `${month}/${date} ${period}`;
+                };
+
+                // Use a simpler label for the chart
+                labels.push(formatTime(startTime));
+
+                minTValues.push(parseInt(item.parameter.parameterName));
+                maxTValues.push(parseInt(maxTData.time[i].parameter.parameterName));
+                popValues.push(parseInt(popData.time[i].parameter.parameterName));
+            });
+
+            renderChart(labels, minTValues, maxTValues, popValues);
+        }
+
+        function renderChart(labels, minT, maxT, pop) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: '最高溫 (°C)',
+                            data: maxT,
+                            borderColor: '#C23531', // CWA-like Red
+                            backgroundColor: '#C23531',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            type: 'line',
+                            label: '最低溫 (°C)',
+                            data: minT,
+                            borderColor: '#2F4554', // Dark Blue/Grey
+                            backgroundColor: '#2F4554',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            type: 'bar',
+                            label: '降雨機率 (%)',
+                            data: pop,
+                            backgroundColor: 'rgba(97, 160, 168, 0.6)', // Teal-ish
+                            borderColor: 'rgba(97, 160, 168, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                            barPercentage: 0.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 20 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            padding: 10,
+                            cornerRadius: 4
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: '溫度 (°C)' },
+                            grid: { color: '#eee' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 0, max: 100,
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '降雨機率 (%)' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
